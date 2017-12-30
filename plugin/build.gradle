@@ -1,0 +1,28 @@
+apply plugin: 'groovy'
+apply plugin: 'maven'
+
+buildscript{
+    repositories{
+        mavenCentral()
+    }
+}
+
+repositories{
+    mavenCentral()
+}
+
+dependencies{
+    compile gradleApi()
+    compile localGroovy()
+}
+
+group='com.guoxiaoxing.cuckoo.plugin'
+version='1.0.0'
+
+uploadArchives{
+    repositories{
+        mavenDeployer{
+            repository(url: uri('../repo'))
+        }
+    }
+}

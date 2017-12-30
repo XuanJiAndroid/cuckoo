@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+apply plugin: 'com.guoxiaoxing.cuckoo.plugin'
+
+buildscript{
+    repositories{
+        maven {
+            url uri('../repo')
+        }
+
+        dependencies{
+            classpath 'com.guoxiaoxing.cuckoo.plugin:plugin:1.0.0'
+        }
+    }
+}
+
+
+
 android {
     compileSdkVersion 26
     defaultConfig {
