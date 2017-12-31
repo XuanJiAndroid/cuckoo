@@ -1,12 +1,22 @@
 package com.guoxiaoxing.cuckoo.plugin
 
+import com.android.build.gradle.AppExtension
+import com.android.build.gradle.AppPlugin
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 
-public class PluginImpl implements Plugin<Project> {
+class PluginImpl implements Plugin<Project> {
 
     @Override
     void apply(Project project) {
+
+        def isApp = project.plugins.hasPlugin(AppPlugin)
+        if(isApp){
+            def android = project.extensions.getByType(AppExtension)
+            def logTransform = new LogTransform(project)
+            android.registerTransform(logTransform)
+        }
+
         project.task('testTask') << {
             println("Hello gradle plugin")
         }

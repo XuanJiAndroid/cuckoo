@@ -3,6 +3,7 @@ apply plugin: 'maven'
 
 buildscript{
     repositories{
+        google()
         mavenCentral()
     }
 }
@@ -14,6 +15,7 @@ repositories{
 dependencies{
     compile gradleApi()
     compile localGroovy()
+    compile 'com.android.tools.build:gradle:3.0.1'
 }
 
 group='com.guoxiaoxing.cuckoo.plugin'
