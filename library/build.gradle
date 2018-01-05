@@ -1,44 +1,7 @@
-import com.android.build.api.transform.QualifiedContent
-import com.android.build.api.transform.Transform
-
 apply plugin: 'com.android.library'
-
-
-class LogTransform extends Transform{
-
-    @Override
-    String getName() {
-        return null
-    }
-
-    @Override
-    Set<QualifiedContent.ContentType> getInputTypes() {
-        return null
-    }
-
-    @Override
-    Set<? super QualifiedContent.Scope> getScopes() {
-        return null
-    }
-
-    @Override
-    boolean isIncremental() {
-        return false
-    }
-}
-
-
-
-
-
-
-
-
 
 android {
     compileSdkVersion 26
-
-
 
     defaultConfig {
         minSdkVersion 15
@@ -61,11 +24,9 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-
     implementation 'com.android.support:appcompat-v7:26.0.0-beta1'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:0.5'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:2.2.2'
-
-    provided 'com.android.tools.build:gradle:3.0.1'
 }
+

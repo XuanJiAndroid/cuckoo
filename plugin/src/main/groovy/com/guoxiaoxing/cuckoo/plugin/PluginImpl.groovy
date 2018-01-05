@@ -13,8 +13,8 @@ class PluginImpl implements Plugin<Project> {
         def isApp = project.plugins.hasPlugin(AppPlugin)
         if(isApp){
             def android = project.extensions.getByType(AppExtension)
-            def logTransform = new LogTransform(project)
-            android.registerTransform(logTransform)
+            def costTimeTransform = new CostTimeTransform()
+            android.registerTransform(costTimeTransform)
         }
 
         project.task('testTask') << {

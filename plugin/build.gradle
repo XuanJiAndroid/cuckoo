@@ -1,6 +1,14 @@
 apply plugin: 'groovy'
 apply plugin: 'maven'
 
+allprojects {
+    repositories {
+        maven {
+            url uri('../repo')
+        }
+    }
+}
+
 buildscript{
     repositories{
         google()
@@ -16,6 +24,7 @@ dependencies{
     compile gradleApi()
     compile localGroovy()
     compile 'com.android.tools.build:gradle:3.0.1'
+    compile 'org.ow2.asm:asm:5.1'
 }
 
 group='com.guoxiaoxing.cuckoo.plugin'
