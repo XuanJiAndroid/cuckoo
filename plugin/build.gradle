@@ -27,7 +27,7 @@ dependencies{
     compile 'org.ow2.asm:asm:5.1'
 }
 
-group='com.guoxiaoxing.cuckoo.plugin'
+group='com.guoxiaoxing.cuckoo'
 version='1.0.0'
 
 uploadArchives{

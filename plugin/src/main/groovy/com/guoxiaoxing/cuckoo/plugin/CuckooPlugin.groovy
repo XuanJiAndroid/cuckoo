@@ -5,7 +5,7 @@ import com.android.build.gradle.AppPlugin
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 
-class PluginImpl implements Plugin<Project> {
+class CuckooPlugin implements Plugin<Project> {
 
     @Override
     void apply(Project project) {
@@ -13,7 +13,7 @@ class PluginImpl implements Plugin<Project> {
         def isApp = project.plugins.hasPlugin(AppPlugin)
         if(isApp){
             def android = project.extensions.getByType(AppExtension)
-            def costTimeTransform = new CostTimeTransform()
+            def costTimeTransform = new CuckooTransform()
             android.registerTransform(costTimeTransform)
         }
 

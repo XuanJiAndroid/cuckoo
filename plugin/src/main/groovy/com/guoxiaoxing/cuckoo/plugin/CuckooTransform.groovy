@@ -15,9 +15,9 @@ import org.objectweb.asm.ClassWriter
  * @author guoxiaoxing
  * @since 2018/1/4 下午5:19
  */
-class CostTimeTransform extends Transform {
+class CuckooTransform extends Transform {
 
-    private static final String TRANSFORM_NAME = "CostTimeTransform";
+    private static final String TRANSFORM_NAME = "CuckooTransform";
 
     @Override
     String getName() {
@@ -42,6 +42,8 @@ class CostTimeTransform extends Transform {
     @Override
     void transform(TransformInvocation transformInvocation) throws TransformException, InterruptedException, IOException {
         super.transform(transformInvocation);
+
+        println('==========================Cuckoo Transform Start=========================')
 
         //ASM start
         def startTime = System.currentTimeMillis()
@@ -89,8 +91,7 @@ class CostTimeTransform extends Transform {
                 def cost = (System.currentTimeMillis() - startTime) / 1000
 
             }
-
-            //ASM end
         }
+        println('==========================Cuckoo Transform End===========================')
     }
 }
