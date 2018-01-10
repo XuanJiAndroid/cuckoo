@@ -1,6 +1,8 @@
 apply plugin: 'com.android.application'
 
-apply plugin: 'com.guoxiaoxing.cuckoo.plugin'
+//apply plugin: 'com.guoxiaoxing.cuckoo.plugin'
+
+apply plugin: 'com.sensorsdata.analytics.android'
 
 buildscript{
     repositories{
@@ -9,7 +11,7 @@ buildscript{
         }
 
         dependencies{
-            classpath 'com.guoxiaoxing.cuckoo:plugin:1.0.0'
+//            classpath 'com.guoxiaoxing.cuckoo:plugin:1.0.0'
         }
     }
 }

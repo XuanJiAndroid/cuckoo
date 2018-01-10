@@ -1,2 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.guoxiaoxing.cuckoo" />
+    package="com.guoxiaoxing.cuckoo">
+
+    <!-- 同步数据需要网络权限 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 获取网络状态 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 获取运营商信息 -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <application>
+        <provider
+            android:name="com.guoxiaoxing.cuckoo.db.SensorsDataContentProvider"
+            android:authorities="${applicationId}.SensorsDataContentProvider"
+            android:enabled="true"
+            android:exported="false" />
+
+        <meta-data
+            android:name="com.guoxiaoxing.cuckoo.android.MainProcessName"
+            android:value="${applicationId}" />
+    </application>
+</manifest>
