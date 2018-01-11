@@ -1,1 +1,1 @@
-include ':demo', ':library', ':plugin'
+include ':demo', ':cuckoo', ':cuckoo-plugin', ':cuckoo-aspectj'
