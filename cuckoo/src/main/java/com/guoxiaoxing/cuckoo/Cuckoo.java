@@ -79,46 +79,37 @@ import java.util.regex.Pattern;
 public class Cuckoo {
 
     private static final String TAG = "Cuckoo";
-
-    // 可视化埋点功能最低API版本
     public static final int VTRACK_SUPPORTED_MIN_API = 16;
-
-    // SDK版本
-    public static final String VERSION = "1.8.16";
-
+    public static final String SDK_VERSION = "1.0.0";
     public static Boolean ENABLE_LOG = false;
     public static Boolean SHOW_DEBUG_INFO_VIEW = true;
-
     private static final Pattern KEY_PATTERN = Pattern.compile(
             "^((?!^distinct_id$|^original_id$|^time$|^properties$|^id$|^first_id$|^second_id$|^users$|^events$|^event$|^user_id$|^date$|^datetime$)[a-zA-Z_$][a-zA-Z\\d_$]{0,99})$",
             Pattern.CASE_INSENSITIVE);
-
-    // Maps each token to a singleton Cuckoo instance
     private static final Map<Context, Cuckoo> sInstanceMap = new HashMap<>();
     private static final SharedPreferencesLoader sPrefsLoader = new SharedPreferencesLoader();
 
-    // Configures
-    /* SensorsAnalytics 地址 */
+    // 后台地址
     private String mServerUrl;
-    /* 可视化埋点配置地址 */
+    // 可视化埋点配置地址
     private final String mConfigureUrl;
-    /* Debug模式选项 */
+    // Debug模式选项
     private DebugMode mDebugMode;
-    /* Flush时间间隔 */
+    // Flush时间间隔
     private int mFlushInterval;
-    /* Flush数据量阈值 */
+    // Flush数据量阈值
     private int mFlushBulkSize;
-    /* SDK 自动采集事件 */
+    // SDK 自动采集事件
     private boolean mAutoTrack;
-    /* SDK 开启可视化埋点功能 */
+    // SDK 开启可视化埋点功能
     private boolean mEnableVTrack;
-    /* AndroidId 作为默认匿名Id */
+    // AndroidId 作为默认匿名Id
     private boolean mEnableAndroidId;
-    /* 上个页面的Url*/
+    // 上个页面的Url
     private String mLastScreenUrl;
     private JSONObject mLastScreenTrackProperties;
     private boolean mEnableButterknifeOnClick;
-    /* $AppViewScreen 事件是否支持 Fragment*/
+    // $AppViewScreen 事件是否支持 Fragment
     private boolean mTrackFragmentAppViewScreen;
     private boolean mEnableReactNativeAutoTrack;
     private boolean mClearReferrerWhenAppEnd = false;
@@ -138,9 +129,7 @@ public class Cuckoo {
     private int mFlushNetworkPolicy = NetworkType.TYPE_3G | NetworkType.TYPE_4G | NetworkType.TYPE_WIFI;
     private final String mMainProcessName;
     private long mMaxCacheSize = 32 * 1024 * 1024; //default 32MB
-
     private final VTrack mVTrack;
-
     private static final SimpleDateFormat mIsFirstDayDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
     /**
@@ -396,7 +385,7 @@ public class Cuckoo {
 
         {
             deviceInfo.put("$lib", "Android");
-            deviceInfo.put("$lib_version", VERSION);
+            deviceInfo.put("$lib_version", SDK_VERSION);
             deviceInfo.put("$os", "Android");
             deviceInfo.put("$os_version",
                     Build.VERSION.RELEASE == null ? "UNKNOWN" : Build.VERSION.RELEASE);
@@ -588,7 +577,7 @@ public class Cuckoo {
             properties.put("time", System.currentTimeMillis());
             properties.put("$app_version", mDeviceInfo.get("$app_version"));
             properties.put("$lib", "Android");
-            properties.put("$lib_version", VERSION);
+            properties.put("$lib_version", SDK_VERSION);
             properties.put("$manufacturer", mDeviceInfo.get("$manufacturer"));
             properties.put("$model", mDeviceInfo.get("$model"));
             properties.put("$os", "Android");
@@ -2283,7 +2272,7 @@ public class Cuckoo {
 
                 JSONObject libProperties = new JSONObject();
                 libProperties.put("$lib", "Android");
-                libProperties.put("$lib_version", VERSION);
+                libProperties.put("$lib_version", SDK_VERSION);
 
                 if (mDeviceInfo.containsKey("$app_version")) {
                     libProperties.put("$app_version", mDeviceInfo.get("$app_version"));

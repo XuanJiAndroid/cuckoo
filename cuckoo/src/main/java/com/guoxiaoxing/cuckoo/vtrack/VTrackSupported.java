@@ -410,7 +410,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
                                     JSONObject payload = new JSONObject();
 
                                     payload.put("$lib", "Android");
-                                    payload.put("$lib_version", Cuckoo.VERSION);
+                                    payload.put("$lib_version", Cuckoo.SDK_VERSION);
                                     payload.put("$os", "Android");
                                     payload
                                             .put("$os_version", Build.VERSION.RELEASE == null ? "UNKNOWN" : Build.VERSION

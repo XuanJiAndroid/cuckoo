@@ -57,6 +57,13 @@ public class ViewPathFinder {
      * elements with no index will be treated as having index == 0
      */
     public static class PathElement {
+        public static final int ZERO_LENGTH_PREFIX = 0;
+        public static final int SHORTEST_PREFIX = 1;
+
+        public final int prefix;
+        public final String viewClassName;
+        public final int index;
+        public final int viewId;
 
         public PathElement(int usePrefix, String vClass, int ix, int vId) {
             prefix = usePrefix;
@@ -87,14 +94,6 @@ public class ViewPathFinder {
                 throw new RuntimeException("Can't serialize PathElement to String", e);
             }
         }
-
-        public final int prefix;
-        public final String viewClassName;
-        public final int index;
-        public final int viewId;
-
-        public static final int ZERO_LENGTH_PREFIX = 0;
-        public static final int SHORTEST_PREFIX = 1;
     }
 
     public interface Accumulator {
@@ -225,6 +224,12 @@ public class ViewPathFinder {
      * Bargain-bin pool of integers, for use in avoiding allocations during path crawl
      */
     private static class IntStack {
+
+        private static final int MAX_INDEX_STACK_SIZE = 256;
+
+        private final int[] mStack;
+        private int mStackSize;
+
         public IntStack() {
             mStack = new int[MAX_INDEX_STACK_SIZE];
             mStackSize = 0;
@@ -265,11 +270,5 @@ public class ViewPathFinder {
                 throw new ArrayIndexOutOfBoundsException(mStackSize);
             }
         }
-
-        private final int[] mStack;
-        private int mStackSize;
-
-        private static final int MAX_INDEX_STACK_SIZE = 256;
     }
-
 }

@@ -79,18 +79,25 @@ public class ViewSnapshot {
         mClassnameCache = new ClassNameCache(MAX_CLASS_NAME_CACHE_SIZE);
     }
 
+    /**
+     * 主线程中扫描已启动的Activity，查询RootView（DecorView），然后进行截屏。
+     *
+     * @param liveActivities liveActivities
+     * @param out            out
+     * @throws IOException IOException
+     */
     public void snapshots(UIThreadSet<Activity> liveActivities, OutputStream out) throws IOException {
         mRootViewFinder.findInActivities(liveActivities);
-        final FutureTask<List<RootViewInfo>> infoFuture =
+        final FutureTask<List<RootViewInfo>> rootInfoFuture =
                 new FutureTask<List<RootViewInfo>>(mRootViewFinder);
-        mMainThreadHandler.post(infoFuture);
+        mMainThreadHandler.post(rootInfoFuture);
 
         final OutputStreamWriter writer = new OutputStreamWriter(out);
-        List<RootViewInfo> infoList = Collections.<RootViewInfo>emptyList();
+        List<RootViewInfo> rootInfoList = Collections.<RootViewInfo>emptyList();
         writer.write("[");
 
         try {
-            infoList = infoFuture.get(1, TimeUnit.SECONDS);
+            rootInfoList = rootInfoFuture.get(1, TimeUnit.SECONDS);
         } catch (final InterruptedException e) {
             LogUtils.i(TAG, "Screenshot interrupted, no screenshot will be sent.", e);
         } catch (final TimeoutException e) {
@@ -101,37 +108,37 @@ public class ViewSnapshot {
             LogUtils.i(TAG, "Exception thrown during screenshot attempt", e);
         }
 
-        final int infoCount = infoList.size();
-        for (int i = 0; i < infoCount; i++) {
-            final RootViewInfo info = infoList.get(i);
+        final int rootInfoCount = rootInfoList.size();
+        for (int i = 0; i < rootInfoCount; i++) {
+            final RootViewInfo rootViewInfo = rootInfoList.get(i);
             if (i > 0) {
                 writer.write(",");
             }
-            if (isSnapShotUpdated(info.screenshot.getImageHash())) {
+            if (isSnapShotUpdated(rootViewInfo.screenshot.getImageHash())) {
                 writer.write("{");
                 writer.write("\"activity\":");
-                writer.write(JSONObject.quote(info.activityName));
+                writer.write(JSONObject.quote(rootViewInfo.activityName));
                 writer.write(",");
                 writer.write("\"scale\":");
-                writer.write(String.format("%s", info.scale));
+                writer.write(String.format("%s", rootViewInfo.scale));
                 writer.write(",");
                 writer.write("\"serialized_objects\":");
                 {
                     final JsonWriter j = new JsonWriter(writer);
                     j.beginObject();
-                    j.name("rootObject").value(info.rootView.hashCode());
+                    j.name("rootObject").value(rootViewInfo.rootView.hashCode());
                     j.name("objects");
-                    snapshotViewHierarchy(j, info.rootView);
+                    snapshotViewHierarchy(j, rootViewInfo.rootView);
                     j.endObject();
                     j.flush();
                 }
                 writer.write(",");
                 writer.write("\"image_hash\":");
-                writer.write(JSONObject.quote(info.screenshot.getImageHash()));
+                writer.write(JSONObject.quote(rootViewInfo.screenshot.getImageHash()));
                 writer.write(",");
                 writer.write("\"screenshot\":");
                 writer.flush();
-                info.screenshot.writeBitmapJSON(Bitmap.CompressFormat.PNG, 100, out);
+                rootViewInfo.screenshot.writeBitmapJSON(Bitmap.CompressFormat.PNG, 100, out);
                 writer.write("}");
             } else {
                 writer.write("{}");
@@ -346,8 +353,14 @@ public class ViewSnapshot {
         }
     }
 
-
     private static class RootViewFinder implements Callable<List<RootViewInfo>> {
+
+        private UIThreadSet<Activity> mLiveActivities;
+        private final List<RootViewInfo> mRootViews;
+        private final DisplayMetrics mDisplayMetrics;
+        private final CachedBitmap mCachedBitmap;
+
+        private final int mClientDensity = DisplayMetrics.DENSITY_DEFAULT;
 
         public RootViewFinder() {
             mDisplayMetrics = new DisplayMetrics();
@@ -441,17 +454,12 @@ public class ViewSnapshot {
             info.scale = scale;
             info.screenshot = mCachedBitmap;
         }
-
-        private UIThreadSet<Activity> mLiveActivities;
-        private final List<RootViewInfo> mRootViews;
-        private final DisplayMetrics mDisplayMetrics;
-        private final CachedBitmap mCachedBitmap;
-
-        private final int mClientDensity = DisplayMetrics.DENSITY_DEFAULT;
     }
 
-
     private static class CachedBitmap {
+        private Bitmap mCached;
+        private final Paint mPaint;
+        private String mImageHash = "";
 
         public CachedBitmap() {
             mPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
@@ -515,24 +523,19 @@ public class ViewSnapshot {
             }
             return ret;
         }
-
-        private Bitmap mCached;
-        private final Paint mPaint;
-        private String mImageHash = "";
     }
 
-
     private static class RootViewInfo {
+        public final String activityName;
+        public final View rootView;
+        public CachedBitmap screenshot;
+        public float scale;
+
         public RootViewInfo(String activityName, View rootView) {
             this.activityName = activityName;
             this.rootView = rootView;
             this.screenshot = null;
             this.scale = 1.0f;
         }
-
-        public final String activityName;
-        public final View rootView;
-        public CachedBitmap screenshot;
-        public float scale;
     }
 }
