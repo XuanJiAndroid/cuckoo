@@ -1,5 +1,5 @@
 apply plugin: 'com.android.application'
-//apply plugin: 'com.guoxiaoxing.cuckoo.plugin'
+apply plugin: 'com.guoxiaoxing.cuckoo.plugin'
 
 android {
     compileSdkVersion rootProject.ext.compileSdkVersion
@@ -28,6 +28,5 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "com.android.support:appcompat-v7:$rootProject.ext.supportLibraryVersion"
 
-    implementation 'com.github.guoxiaoxing:cuckoo-aspectj:0.0.1'
-    implementation project(':cuckoo')
+    implementation project(':cuckoo-core')
 }

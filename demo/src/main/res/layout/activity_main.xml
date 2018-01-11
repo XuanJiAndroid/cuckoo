@@ -13,6 +13,5 @@
         android:layout_margin="16dp"
         android:background="@android:color/holo_blue_light"
         android:text="埋点"
-        android:textColor="@android:color/white"
-        android:visibility="gone" />
+        android:textColor="@android:color/white"/>
 </LinearLayout>

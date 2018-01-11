@@ -8,8 +8,8 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/cuckoo" />
             <option value="$PROJECT_DIR$/cuckoo-aspectj" />
+            <option value="$PROJECT_DIR$/cuckoo-core" />
             <option value="$PROJECT_DIR$/cuckoo-plugin" />
             <option value="$PROJECT_DIR$/demo" />
           </set>

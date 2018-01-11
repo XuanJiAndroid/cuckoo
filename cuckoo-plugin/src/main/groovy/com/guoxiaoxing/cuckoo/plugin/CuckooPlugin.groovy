@@ -7,10 +7,20 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.tasks.compile.JavaCompile
 
-class SensorsAnalyticsPlugin implements Plugin<Project> {
+class CuckooPlugin implements Plugin<Project> {
 
     @Override
     void apply(Project project) {
+
+        println("============================================================================")
+        println("==                                                                        ==")
+        println("==                      Cuckoo byte code insert ...                       ==")
+        println("==                                                                        ==")
+        println("==   For more information, you can visit  https://github.com/guoxiaoxing  ==")
+        println("==   or contact me by guoxiaoxingse@163.com.                              ==")
+        println("==                                                                        ==")
+        println("==                                                                        ==")
+        println("============================================================================")
 
         project.repositories.flatDir { dirs 'libs' }
 
@@ -18,7 +28,7 @@ class SensorsAnalyticsPlugin implements Plugin<Project> {
 
         project.dependencies {
             compile 'org.aspectj:aspectjrt:1.8.13'
-            compile 'com.github.guoxiaoxing:cuckoo-aspectj:0.0.1'
+            compile 'com.github.guoxiaoxing:cuckoo-aspectj:0.0.5'
         }
 
         project.extensions.create("cuckoo", CuckooExtension)
@@ -38,17 +48,6 @@ class SensorsAnalyticsPlugin implements Plugin<Project> {
                 ]
                 MessageHandler handler = new MessageHandler(true);
                 new Main().run(args, handler);
-
-                println("============================================================================")
-                println("==                                                                        ==")
-                println("==                      Cuckoo byte code insert ...                       ==")
-                println("==                                                                        ==")
-                println("==   For more information, you can visit  https://github.com/guoxiaoxing  ==")
-                println("==   or contact me by guoxiaoxingse@163.com.                              ==")
-                println("==                                                                        ==")
-                println("==                                                                        ==")
-                println("============================================================================")
-
                 for (IMessage message : handler.getMessages(null, true)) {
                     switch (message.getKind()) {
                         case IMessage.ABORT:

@@ -89,7 +89,7 @@ public class AspectjClient {
             }
 
             if (clazz == null) {
-                clazz = Class.forName("com.guoxiaoxing.cuckoo.aspectj.bridge.AspectjServe");
+                clazz = Class.forName("com.guoxiaoxing.cuckoo.aspectj.bridge.AspectjServer");
             }
             if (clazz == null) {
                 return;

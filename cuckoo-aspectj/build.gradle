@@ -48,5 +48,5 @@ publish {
     artifactId = 'cuckoo-aspectj'
     publishVersion = "$rootProject.ext.pluginVersion"
     desc = 'The one-stop solution for data collection on the Android platform.'
-    website = 'https://github.com/guoxiaoxing/Cuckoo'
+    website = 'https://github.com/guoxiaoxing/cuckoo'
 }

@@ -2,6 +2,7 @@ package com.guoxiaoxing.cuckoo.aspectj;
 
 import android.app.Activity;
 import android.content.Context;
+import android.support.v7.widget.SwitchCompat;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,31 +18,50 @@ import android.widget.ToggleButton;
 
 import com.guoxiaoxing.cuckoo.Cuckoo;
 import com.guoxiaoxing.cuckoo.R;
+import com.guoxiaoxing.cuckoo.annotation.ignore.IgnoreTrackOnClick;
 import com.guoxiaoxing.cuckoo.aspectj.bridge.AspectjConstants;
 import com.guoxiaoxing.cuckoo.util.LogUtils;
 import com.guoxiaoxing.cuckoo.util.ViewUtils;
 
 import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.json.JSONObject;
 
-public class TrackViewReal {
+import java.lang.reflect.Method;
 
-    private final static String TAG = "TrackViewReal";
+public class ViewOnClickReal {
+    private final static String TAG = "ViewOnClickReal";
 
     public static void onAppClick(JoinPoint joinPoint) {
         try {
+            //基本校验
+            if (joinPoint.getArgs() == null || joinPoint.getArgs().length != 1) {
+                return;
+            }
+
             //关闭 AutoTrack
             if (!Cuckoo.with().isAutoTrackEnabled()) {
                 return;
             }
 
-            //$AppClick 被过滤
-            if (Cuckoo.with().isAutoTrackEventTypeIgnored(Cuckoo.AutoTrackEventType.APP_CLICK)) {
+            MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
+            if (methodSignature == null) {
                 return;
             }
 
-            //基本校验
-            if (joinPoint == null || joinPoint.getArgs() == null || joinPoint.getArgs().length != 1) {
+            //忽略 onClick
+            Method method = methodSignature.getMethod();
+            if (method == null) {
+                return;
+            }
+
+            IgnoreTrackOnClick trackEvent = method.getAnnotation(IgnoreTrackOnClick.class);
+            if (trackEvent != null) {
+                return;
+            }
+
+            //$AppClick 被过滤
+            if (Cuckoo.with().isAutoTrackEventTypeIgnored(Cuckoo.AutoTrackEventType.APP_CLICK)) {
                 return;
             }
 
@@ -54,7 +74,7 @@ public class TrackViewReal {
             //获取所在的 Context
             Context context = view.getContext();
             if (context == null) {
-                return;
+//                        return;
             }
 
             //将 Context 转成 Activity
@@ -110,6 +130,10 @@ public class TrackViewReal {
                 viewType = "CheckBox";
                 CheckBox checkBox = (CheckBox) view;
                 viewText = checkBox.getText();
+            } else if (view instanceof SwitchCompat) {
+                viewType = "SwitchCompat";
+                SwitchCompat switchCompat = (SwitchCompat) view;
+                viewText = switchCompat.getTextOn();
             } else if (view instanceof RadioButton) { // RadioButton
                 viewType = "RadioButton";
                 RadioButton radioButton = (RadioButton) view;
@@ -168,10 +192,11 @@ public class TrackViewReal {
                 ViewUtils.mergeJSONObject(p, properties);
             }
             Toast.makeText(view.getContext(), String.valueOf(properties.get(AspectjConstants.ELEMENT_ID)), Toast.LENGTH_LONG).show();
+
             Cuckoo.with().track(AspectjConstants.APP_CLICK_EVENT_NAME, properties);
         } catch (Exception e) {
             e.printStackTrace();
-            LogUtils.i(TAG, "TrackViewOnClick error: " + e.getMessage());
+            LogUtils.i(TAG, "onViewClickMethod error: " + e.getMessage());
         }
     }
 }
