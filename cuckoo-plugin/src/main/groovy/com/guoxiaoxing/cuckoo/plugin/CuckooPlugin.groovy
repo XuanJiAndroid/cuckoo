@@ -27,7 +27,7 @@ class CuckooPlugin implements Plugin<Project> {
         final def log = project.logger
 
         project.dependencies {
-            compile 'org.aspectj:aspectjrt:1.8.13'
+            compile 'org.aspectj:aspectjrt:1.8.10'
             compile 'com.github.guoxiaoxing:cuckoo-aspectj:0.0.5'
         }
 

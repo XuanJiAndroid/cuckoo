@@ -17,7 +17,7 @@ dependencies{
     implementation localGroovy()
     implementation 'com.android.tools.build:gradle:3.0.1'
     implementation "org.aspectj:aspectjtools:1.8.10"
-    implementation "org.aspectj:aspectjrt:1.8.13"
+    implementation "org.aspectj:aspectjrt:1.8.10"
 }
 
 publish {
