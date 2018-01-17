@@ -1,6 +1,9 @@
 apply plugin: 'groovy'
 apply plugin: 'com.novoda.bintray-release'
 
+targetCompatibility = JavaVersion.VERSION_1_7
+sourceCompatibility = JavaVersion.VERSION_1_7
+
 buildscript{
     repositories{
         google()
@@ -17,7 +20,7 @@ dependencies{
     implementation localGroovy()
     implementation 'com.android.tools.build:gradle:3.0.1'
     implementation "org.aspectj:aspectjtools:1.8.10"
-    implementation "org.aspectj:aspectjrt:1.8.10"
+    implementation "org.aspectj:aspectjrt:1.8.13"
 }
 
 publish {

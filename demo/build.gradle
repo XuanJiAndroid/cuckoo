@@ -1,7 +1,3 @@
-import org.aspectj.bridge.IMessage
-import org.aspectj.bridge.MessageHandler
-import org.aspectj.tools.ajc.Main
-
 apply plugin: 'com.android.application'
 //apply plugin: 'com.guoxiaoxing.cuckoo.plugin'
 
@@ -31,10 +27,15 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "com.android.support:appcompat-v7:$rootProject.ext.supportLibraryVersion"
+    compile 'org.aspectj:aspectjrt:1.8.13'
 
     implementation project(':cuckoo-core')
     implementation project(':cuckoo-aspectj')
 }
+
+import org.aspectj.bridge.IMessage
+import org.aspectj.bridge.MessageHandler
+import org.aspectj.tools.ajc.Main
 
 buildscript {
     repositories {
@@ -61,7 +62,7 @@ variants.all { variant ->
     JavaCompile javaCompile = variant.javaCompile
     javaCompile.doLast {
         String[] args = ["-showWeaveInfo",
-                         "-1.5",
+                         "-1.7",
                          "-inpath", javaCompile.destinationDir.toString(),
                          "-aspectpath", javaCompile.classpath.asPath,
                          "-d", javaCompile.destinationDir.toString(),
@@ -91,4 +92,3 @@ variants.all { variant ->
         }
     }
 }
-

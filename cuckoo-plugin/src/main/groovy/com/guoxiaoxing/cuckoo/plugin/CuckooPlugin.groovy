@@ -14,7 +14,7 @@ class CuckooPlugin implements Plugin<Project> {
 
         println("============================================================================")
         println("==                                                                        ==")
-        println("==                      Cuckoo byte code insert ...                       ==")
+        println("==                      Cuckoo Bytecode Insert ...                        ==")
         println("==                                                                        ==")
         println("==   For more information, you can visit  https://github.com/guoxiaoxing  ==")
         println("==   or contact me by guoxiaoxingse@163.com.                              ==")
@@ -27,8 +27,8 @@ class CuckooPlugin implements Plugin<Project> {
         final def log = project.logger
 
         project.dependencies {
-            compile 'org.aspectj:aspectjrt:1.8.10'
-            compile 'com.github.guoxiaoxing:cuckoo-aspectj:0.0.5'
+            implementation 'org.aspectj:aspectjrt:1.8.10'
+            implementation 'com.github.guoxiaoxing:cuckoo-aspectj:0.0.9'
         }
 
         project.extensions.create("cuckoo", CuckooExtension)
