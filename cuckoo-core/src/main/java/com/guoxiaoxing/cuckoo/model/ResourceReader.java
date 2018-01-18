@@ -11,16 +11,28 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * SDK内部接口
+ * 读取View的资源ID
+ *
+ * For more information, you can visit https://github.com/guoxiaoxing or contact me by
+ * guoxiaoxingse@163.com.
+ *
+ * @author guoxiaoxing
  */
 public abstract class ResourceReader implements ResourceIds {
+
+    @SuppressWarnings("unused")
+    private static final String TAG = "SCuckoo.ResourceReader";
+
+    private final Context mContext;
+    private final Map<String, Integer> mIdNameToId;
+    private final SparseArray<String> mIdToIdName;
 
     public static class Ids extends ResourceReader {
 
         public Ids(String resourcePackageName, Context context) {
             super(context);
             mResourcePackageName = resourcePackageName;
-            initialize();
+            setup();
         }
 
         @Override
@@ -42,7 +54,7 @@ public abstract class ResourceReader implements ResourceIds {
         protected Drawables(String resourcePackageName, Context context) {
             super(context);
             mResourcePackageName = resourcePackageName;
-            initialize();
+            setup();
         }
 
         @Override
@@ -110,7 +122,7 @@ public abstract class ResourceReader implements ResourceIds {
 
     protected abstract String getLocalClassName(Context context);
 
-    protected void initialize() {
+    protected void setup() {
         mIdNameToId.clear();
         mIdToIdName.clear();
 
@@ -149,11 +161,4 @@ public abstract class ResourceReader implements ResourceIds {
             mIdToIdName.put(idMapping.getValue(), idMapping.getKey());
         }
     }
-
-    @SuppressWarnings("unused")
-    private static final String TAG = "SA.ResourceReader";
-
-    private final Context mContext;
-    private final Map<String, Integer> mIdNameToId;
-    private final SparseArray<String> mIdToIdName;
 }

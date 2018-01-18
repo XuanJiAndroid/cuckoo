@@ -26,6 +26,12 @@ import java.util.Set;
  */
 public class EditState extends UIThreadSet<Activity> {
 
+    private static final String LOGTAG = "SCuckoo.EditState";
+
+    private final Handler mUiThreadHandler;
+    private final Map<String, List<ViewVisitor>> mIntendedEdits;
+    private final Map<Activity, Set<EditBinding>> mCurrentEdits;
+
     public EditState() {
         mUiThreadHandler = new Handler(Looper.getMainLooper());
         mIntendedEdits = new HashMap<>();
@@ -229,11 +235,4 @@ public class EditState extends UIThreadSet<Activity> {
         private final ViewVisitor mEdit;
         private final Handler mHandler;
     }
-
-
-    private final Handler mUiThreadHandler;
-    private final Map<String, List<ViewVisitor>> mIntendedEdits;
-    private final Map<Activity, Set<EditBinding>> mCurrentEdits;
-
-    private static final String LOGTAG = "SA.EditState";
 }

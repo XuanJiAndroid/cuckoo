@@ -41,12 +41,9 @@ public class App extends Application {
         setupCuckoo();
     }
 
-    /**
-     * 初始化 Sensors Analytics SDK
-     */
     private void setupCuckoo() {
         Cuckoo.with(
-                this,                               // 传入 Context
+                this,                       // 传入 Context
                 SA_SERVER_URL,                      // 数据接收的 URL
                 SA_CONFIGURE_URL,                   // 配置分发的 URL
                 SA_DEBUG_MODE);                     // Debug 模式选项

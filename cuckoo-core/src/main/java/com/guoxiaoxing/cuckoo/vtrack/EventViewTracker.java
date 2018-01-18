@@ -1,6 +1,5 @@
 package com.guoxiaoxing.cuckoo.vtrack;
 
-
 import android.content.Context;
 import android.os.Handler;
 import android.view.View;

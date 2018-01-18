@@ -72,11 +72,12 @@ App切换Activity时发送$AppViewScreen事件，记录页面切换相关信息�
 - 本地缓存日志数目是否大于 flushBulkSize
 
 
-
-
-
 - com.guoxiaoxing.cuckoo.android.FlushInterval - 设置 SDK 的 flushInterval，单位毫秒，默认值为 15 秒；
 - com.guoxiaoxing.cuckoo.android.FlushBulkSize - 设置 SDK 的 flushBulkSize，默认值为 100；
 - com.guoxiaoxing.cuckoo.android.ResourcePackageName - 设置 App 的 Package Name，默认值为 Application 对象的 Package Name，当 App 的 R.* class 的 Package Name 与 Application不同时，需要手动填入该配置；
 - com.guoxiaoxing.cuckoo.android.AndroidId - 1.6.40 及以后的版本支持将 Android ID 作为默认匿名 ID，"true" 表示使用 Android ID 作为 匿名 ID ，"false" 表示使用 Sensors Analytics SDK 随机分配一个唯一 ID（UUID）作为 匿名 ID ，默认值为 "false"；
 - com.guoxiaoxing.cuckoo.android.ShowDebugInfoView- 1.6.40 及以后的版本支持设置 Toast ，"true" 表示 Debug 模式 下 出现错时显示 Toast 提示，"false" 表示不显示 Toast 提示，默认值为"true"；
+
+
+事件上传流程
+

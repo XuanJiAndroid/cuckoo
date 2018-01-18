@@ -23,9 +23,9 @@ import android.util.Pair;
 
 import com.guoxiaoxing.cuckoo.Cuckoo;
 import com.guoxiaoxing.cuckoo.debug.DebugTracking;
+import com.guoxiaoxing.cuckoo.event.EditState;
 import com.guoxiaoxing.cuckoo.model.ResourceIds;
 import com.guoxiaoxing.cuckoo.model.ResourceReader;
-import com.guoxiaoxing.cuckoo.event.EditState;
 import com.guoxiaoxing.cuckoo.util.Base64Coder;
 import com.guoxiaoxing.cuckoo.util.DataUtils;
 import com.guoxiaoxing.cuckoo.util.JSONUtils;
@@ -52,8 +52,58 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPOutputStream;
 
+/**
+ * 可视化埋点，调度截屏工具ViewSnapshot
+ * <p>
+ * For more information, you can visit https://github.com/guoxiaoxing or contact me by
+ * guoxiaoxingse@163.com.
+ *
+ * @author guoxiaoxing
+ */
 @TargetApi(Cuckoo.VTRACK_SUPPORTED_MIN_API)
 public class VTrackSupported implements VTrack, DebugTracking {
+
+    private static final String TAG = "SCuckoo.VTrackSupported";
+
+    private static final String SHARED_PREF_EDITS_FILE = "sensorsdata";
+    private static final String SHARED_PREF_BINDINGS_KEY = "sensorsdata.viewcrawler.bindings";
+
+    private static final int MESSAGE_INITIALIZE_CHANGES = 0;
+    private static final int MESSAGE_CONNECT_TO_EDITOR = 1;
+    private static final int MESSAGE_SEND_STATE_FOR_EDITING = 2;
+    private static final int MESSAGE_SEND_DEVICE_INFO = 4;
+    private static final int MESSAGE_EVENT_BINDINGS_RECEIVED = 5;
+    private static final int MESSAGE_HANDLE_EDITOR_BINDINGS_RECEIVED = 6;
+    private static final int MESSAGE_SEND_EVENT_TRACKED = 7;
+    private static final int MESSAGE_HANDLE_EDITOR_CLOSED = 8;
+    private static final int MESSAGE_HANDLE_DISCONNECT = 13;
+
+    private static final int EMULATOR_CONNECT_ATTEMPT_INTERVAL_MILLIS = 1000 * 30;
+
+    private static boolean mIsRetryConnect = true;
+    private static int mCurrentRetryTimes = 0;
+    private static final int CONNECT_RETRY_TIMES = 40;
+    private static final long RETRY_TIME_INTERVAL = 30 * 1000;
+    /*
+        WebSocket close Code:
+        check com.guoxiaoxing.cuckoo.java_websocket.framing.CloseFrame.NORMAL
+    */
+    private static final int CLOSE_CODE_NORMAL = 1000;
+    private static final int CLOSE_CODE_GOING_AWAY = 1001;
+    private static final int CLOSE_CODE_NOCODE = 1005;
+
+    private final Context mContext;
+    private final LifecycleCallbacks mLifecycleCallbacks;
+    private final EventViewTracker mEventViewTracker;
+    private final EditState mEditState;
+    private final ViewFinderHandler mMessageThreadHandler;
+
+    // VTrack Server 地址
+    private String mVTrackServer = null;
+
+    //当前显示的Activity
+    private final HashSet<Activity> mStartedActivities = new HashSet<>();
+    private final HashSet<String> mDisabledActivity = new HashSet<String>();
 
     public VTrackSupported(Context context, String resourcePackageName) {
         mContext = context;
@@ -68,7 +118,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
                 new HandlerThread(VTrackSupported.class.getCanonicalName(), Process.THREAD_PRIORITY_BACKGROUND);
         thread.start();
 
-        mMessageThreadHandler = new ViewCrawlerHandler(context, thread.getLooper(), resourcePackageName);
+        mMessageThreadHandler = new ViewFinderHandler(context, thread.getLooper(), resourcePackageName);
 
         mEventViewTracker = new EventViewTracker(context, mMessageThreadHandler);
     }
@@ -133,6 +183,9 @@ public class VTrackSupported implements VTrack, DebugTracking {
     }
 
     private class EmulatorConnector implements Runnable {
+
+        private volatile boolean mStopped;
+
         public EmulatorConnector() {
             mStopped = true;
         }
@@ -165,12 +218,15 @@ public class VTrackSupported implements VTrack, DebugTracking {
             mStopped = true;
             mMessageThreadHandler.removeCallbacks(this);
         }
-
-        private volatile boolean mStopped;
     }
 
-    private class LifecycleCallbacks
-            implements Application.ActivityLifecycleCallbacks {
+    /**
+     * Activity生命周期，采集当前显示的Activity。
+     */
+    private class LifecycleCallbacks implements Application.ActivityLifecycleCallbacks {
+
+        private boolean mEnableConnector = false;
+        private final EmulatorConnector mEmulatorConnector = new EmulatorConnector();
 
         public LifecycleCallbacks() {
         }
@@ -231,25 +287,37 @@ public class VTrackSupported implements VTrack, DebugTracking {
         @Override
         public void onActivityDestroyed(Activity activity) {
         }
-
-        private final EmulatorConnector mEmulatorConnector = new EmulatorConnector();
-
-        private boolean mEnableConnector = false;
     }
 
+    /**
+     * 查找事件对应的View
+     */
+    private class ViewFinderHandler extends Handler {
 
-    private class ViewCrawlerHandler extends Handler {
+        private VTrackClient mVTrackClient;
+        private ViewSnapshot mSnapshot;
+        private final Context mContext;
+        private final Lock mStartLock;
+        private final VTrackProtocol mProtocol;
 
-        public ViewCrawlerHandler(Context context, Looper looper, String resourcePackageName) {
+        // 是否启用 GZip 压缩
+        private boolean mUseGzip;
+
+        private int mHasRetryCount = 0;
+
+        private final List<Pair<String, JSONObject>> mVTrackEventBindings;
+        private final List<Pair<String, JSONObject>> mPersistentEventBindings;
+
+        public ViewFinderHandler(Context context, Looper looper, String resourcePackageName) {
             super(looper);
             mContext = context;
             mSnapshot = null;
 
             final ResourceIds resourceIds = new ResourceReader.Ids(resourcePackageName, context);
 
-            mProtocol = new EditProtocol(resourceIds);
-            mEditorEventBindings = new ArrayList<Pair<String, JSONObject>>();
-            mPersistentEventBindings = new ArrayList<Pair<String, JSONObject>>();
+            mProtocol = new VTrackProtocol(resourceIds);
+            mVTrackEventBindings = new ArrayList<>();
+            mPersistentEventBindings = new ArrayList<>();
 
             // 默认关闭 GZip 压缩
             mUseGzip = false;
@@ -264,15 +332,16 @@ public class VTrackSupported implements VTrack, DebugTracking {
 
         @Override
         public void handleMessage(Message msg) {
-            mStartLock.lock();//pay close attention to this
+            //pay close attention to this
+            mStartLock.lock();
 
             try {
                 switch (msg.what) {
                     case MESSAGE_INITIALIZE_CHANGES:
-                        initializeBindings();
+                        setupBindings();
                         break;
                     case MESSAGE_CONNECT_TO_EDITOR:
-                        connectToEditor();
+                        connectToVTrackServer();
                         break;
                     case MESSAGE_SEND_DEVICE_INFO:
                         sendDeviceInfo((JSONObject) msg.obj);
@@ -281,7 +350,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
                         sendSnapshot((JSONObject) msg.obj);
                         break;
                     case MESSAGE_SEND_EVENT_TRACKED:
-                        sendReportTrackToEditor((JSONObject) msg.obj);
+                        sendReportTrackToServer((JSONObject) msg.obj);
                         break;
                     case MESSAGE_EVENT_BINDINGS_RECEIVED:
                         handleEventBindingsReceived((JSONArray) msg.obj);
@@ -290,7 +359,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
                         handleEditorBindingsReceived((JSONObject) msg.obj);
                         break;
                     case MESSAGE_HANDLE_EDITOR_CLOSED:
-                        handleEditorClosed();
+                        handleVTrackServerClosed();
                         break;
                     case MESSAGE_HANDLE_DISCONNECT:
                         handleDisconnect();
@@ -304,7 +373,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
         /**
          * Load stored changes from persistent storage and apply them to the application.
          */
-        private void initializeBindings() {
+        private void setupBindings() {
             final SharedPreferences preferences = getSharedPreferences();
             final String storedBindings = preferences.getString(SHARED_PREF_BINDINGS_KEY, null);
             try {
@@ -330,7 +399,6 @@ public class VTrackSupported implements VTrack, DebugTracking {
             applyVariantsAndEventBindings();
         }
 
-        private int mHasRetryCount = 0;
         private void retrySendDeviceInfo(final JSONObject message) {
             if (mHasRetryCount < 3) {
                 mHasRetryCount++;
@@ -343,8 +411,8 @@ public class VTrackSupported implements VTrack, DebugTracking {
         /**
          * Try to connect to the remote interactive editor, if a connection does not already exist.
          */
-        private void connectToEditor() {
-            if (mEditorConnection != null && mEditorConnection.isValid()) {
+        private void connectToVTrackServer() {
+            if (mVTrackClient != null && mVTrackClient.isValid()) {
                 LogUtils.i(TAG, "The VTrack server has been connected.");
                 return;
             }
@@ -353,10 +421,10 @@ public class VTrackSupported implements VTrack, DebugTracking {
                 LogUtils.i(TAG, "Connecting to the VTrack server with " + mVTrackServer);
 
                 try {
-                    mEditorConnection = new EditorConnection(new URI(mVTrackServer), new Editor());
+                    mVTrackClient = new VTrackClient(new URI(mVTrackServer), new VTrackClientConnection());
                 } catch (final URISyntaxException e) {
                     LogUtils.i(TAG, "Error parsing URI " + mVTrackServer + " for VTrack webSocket", e);
-                } catch (final EditorConnection.EditorConnectionException e) {
+                } catch (final VTrackClient.EditorConnectionException e) {
                     LogUtils.i(TAG, "Error connecting to URI " + mVTrackServer, e);
                 }
             }
@@ -366,7 +434,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
          * Report on device info to the connected web UI.
          */
         private void sendDeviceInfo(final JSONObject message) {
-            if (mEditorConnection == null || !mEditorConnection.isValid()) {
+            if (mVTrackClient == null || !mVTrackClient.isValid()) {
                 return;
             }
 
@@ -378,8 +446,8 @@ public class VTrackSupported implements VTrack, DebugTracking {
             Activity activity = activityIt.next();
 
             if (activity == null) {
-                if (mEditorConnection != null) {
-                    mEditorConnection.close(true);
+                if (mVTrackClient != null) {
+                    mVTrackClient.close(true);
                 }
                 return;
             }
@@ -429,8 +497,8 @@ public class VTrackSupported implements VTrack, DebugTracking {
                                     payload.put("$device_model", Build.MODEL == null ? "UNKNOWN" : Build.MODEL);
                                     payload.put("$device_id", DataUtils.getDeviceID(mContext));
 
-                                    if (mEditorConnection != null && mEditorConnection.isValid()) {
-                                        mEditorConnection
+                                    if (mVTrackClient != null && mVTrackClient.isValid()) {
+                                        mVTrackClient
                                                 .sendMessage(setUpPayload("device_info_response", payload).toString());
                                     }
                                 } catch (JSONException e) {
@@ -445,11 +513,11 @@ public class VTrackSupported implements VTrack, DebugTracking {
                             public void onClick(DialogInterface dialog, int which) {
                                 dialog.dismiss();
 
-                                if (mEditorConnection == null) {
+                                if (mVTrackClient == null) {
                                     return;
                                 }
 
-                                mEditorConnection.close(true);
+                                mVTrackClient.close(true);
                             }
                         }).show();
             } catch (RuntimeException e) {
@@ -461,7 +529,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
          * Send a snapshot response, with crawled views and screenshot image, to the connected web UI.
          */
         private void sendSnapshot(JSONObject message) {
-            if (mEditorConnection == null || !mEditorConnection.isValid()) {
+            if (mVTrackClient == null || !mVTrackClient.isValid()) {
                 return;
             }
 
@@ -474,7 +542,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
                 }
 
                 if (null == mSnapshot) {
-                    LogUtils.i(TAG, "Snapshot should be initialize at first calling.");
+                    LogUtils.i(TAG, "Snapshot should be setup at first calling.");
                     return;
                 }
 
@@ -485,7 +553,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
             } catch (final JSONException e) {
                 LogUtils.i(TAG, "Payload with snapshot config required with snapshot request", e);
                 return;
-            } catch (final EditProtocol.BadInstructionsException e) {
+            } catch (final VTrackProtocol.BadInstructionsException e) {
                 LogUtils.i(TAG, "VTrack server sent malformed message with snapshot request", e);
                 return;
             }
@@ -548,8 +616,8 @@ public class VTrackSupported implements VTrack, DebugTracking {
                 }
             }
 
-            if (mEditorConnection != null && mEditorConnection.isValid()) {
-                mEditorConnection.sendMessage(out.toString());
+            if (mVTrackClient != null && mVTrackClient.isValid()) {
+                mVTrackClient.sendMessage(out.toString());
             }
         }
 
@@ -557,11 +625,11 @@ public class VTrackSupported implements VTrack, DebugTracking {
          * Report the eventBinding response to the connected web UI.
          */
         private void sendEventBindingResponse(boolean result) {
-            if (mEditorConnection == null || !mEditorConnection.isValid()) {
+            if (mVTrackClient == null || !mVTrackClient.isValid()) {
                 return;
             }
 
-            //final OutputStream out = mEditorConnection.getBufferedOutputStream();
+            //final OutputStream out = mVTrackClient.getBufferedOutputStream();
             final ByteArrayOutputStream out = new ByteArrayOutputStream();
             final JsonWriter j = new JsonWriter(new OutputStreamWriter(out));
 
@@ -582,16 +650,16 @@ public class VTrackSupported implements VTrack, DebugTracking {
                 }
             }
 
-            if (mEditorConnection != null && mEditorConnection.isValid()) {
-                mEditorConnection.sendMessage(out.toString());
+            if (mVTrackClient != null && mVTrackClient.isValid()) {
+                mVTrackClient.sendMessage(out.toString());
             }
         }
 
         /**
          * Report that a track has occurred to the connected web UI.
          */
-        private void sendReportTrackToEditor(JSONObject eventJson) {
-            if (mEditorConnection == null || !mEditorConnection.isValid() || eventJson == null) {
+        private void sendReportTrackToServer(JSONObject eventJson) {
+            if (mVTrackClient == null || !mVTrackClient.isValid() || eventJson == null) {
                 return;
             }
 
@@ -607,7 +675,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
                 return;
             }
 
-            final OutputStream out = mEditorConnection.getBufferedOutputStream();
+            final OutputStream out = mVTrackClient.getBufferedOutputStream();
             final OutputStreamWriter writer = new OutputStreamWriter(out);
 
             try {
@@ -650,7 +718,7 @@ public class VTrackSupported implements VTrack, DebugTracking {
             final SharedPreferences.Editor editor = preferences.edit();
             editor.putString(SHARED_PREF_BINDINGS_KEY, eventBindings.toString());
             editor.apply();
-            initializeBindings();
+            setupBindings();
         }
 
         /**
@@ -674,12 +742,12 @@ public class VTrackSupported implements VTrack, DebugTracking {
 
             final int eventCount = eventBindings.length();
 
-            mEditorEventBindings.clear();
+            mVTrackEventBindings.clear();
             for (int i = 0; i < eventCount; i++) {
                 try {
                     final JSONObject event = eventBindings.getJSONObject(i);
                     final String targetActivity = JSONUtils.optionalStringKey(event, "target_activity");
-                    mEditorEventBindings.add(new Pair<String, JSONObject>(targetActivity, event));
+                    mVTrackEventBindings.add(new Pair<String, JSONObject>(targetActivity, event));
                 } catch (final JSONException e) {
                     LogUtils.i(TAG, "Bad event binding received from VTrack server in " + eventBindings
                             .toString(), e);
@@ -692,12 +760,12 @@ public class VTrackSupported implements VTrack, DebugTracking {
         /**
          * Clear state associated with the editor now that the editor is gone.
          */
-        private void handleEditorClosed() {
+        private void handleVTrackServerClosed() {
             LogUtils.i(TAG, "VTrack server connection closed.");
 
             mSnapshot = null;
 
-            mEditorEventBindings.clear();
+            mVTrackEventBindings.clear();
             applyVariantsAndEventBindings();
         }
 
@@ -705,12 +773,12 @@ public class VTrackSupported implements VTrack, DebugTracking {
          * disconnect webSocket server;.
          */
         private void handleDisconnect() {
-            if (mEditorConnection == null) {
+            if (mVTrackClient == null) {
                 return;
             }
 
             mLifecycleCallbacks.disableConnector();
-            mEditorConnection.close(true);
+            mVTrackClient.close(true);
         }
 
         /**
@@ -729,18 +797,18 @@ public class VTrackSupported implements VTrack, DebugTracking {
 
             LogUtils.i(TAG, String.format(Locale.CHINA, "Event bindings are loaded. %d events from VTrack editor "
                             + "，%d events from VTrack configure",
-                    mEditorEventBindings.size(), mPersistentEventBindings.size()));
+                    mVTrackEventBindings.size(), mPersistentEventBindings.size()));
 
-            if (mEditorEventBindings.size() > 0) {
+            if (mVTrackEventBindings.size() > 0) {
                 // 如果mEditorEventBindings.size() > 0，说明连接了VTrack模拟器，只是用模拟器下发的事件配置
-                for (Pair<String, JSONObject> changeInfo : mEditorEventBindings) {
+                for (Pair<String, JSONObject> changeInfo : mVTrackEventBindings) {
                     try {
                         final ViewVisitor visitor =
                                 mProtocol.readEventBinding(changeInfo.second, mEventViewTracker);
                         newVisitors.add(new Pair<String, ViewVisitor>(changeInfo.first, visitor));
-                    } catch (final EditProtocol.InapplicableInstructionsException e) {
+                    } catch (final VTrackProtocol.InapplicableInstructionsException e) {
                         LogUtils.i(TAG, e.getMessage());
-                    } catch (final EditProtocol.BadInstructionsException e) {
+                    } catch (final VTrackProtocol.BadInstructionsException e) {
                         LogUtils.i(TAG, "Bad editor event binding cannot be applied.", e);
                     }
                 }
@@ -750,9 +818,9 @@ public class VTrackSupported implements VTrack, DebugTracking {
                         final ViewVisitor visitor =
                                 mProtocol.readEventBinding(changeInfo.second, mEventViewTracker);
                         newVisitors.add(new Pair<String, ViewVisitor>(changeInfo.first, visitor));
-                    } catch (final EditProtocol.InapplicableInstructionsException e) {
+                    } catch (final VTrackProtocol.InapplicableInstructionsException e) {
                         LogUtils.i(TAG, e.getMessage());
-                    } catch (final EditProtocol.BadInstructionsException e) {
+                    } catch (final VTrackProtocol.BadInstructionsException e) {
                         LogUtils.i(TAG, "Bad persistent event binding cannot be applied.", e);
                     }
                 }
@@ -801,22 +869,9 @@ public class VTrackSupported implements VTrack, DebugTracking {
             final String sharedPrefsName = SHARED_PREF_EDITS_FILE;
             return mContext.getSharedPreferences(sharedPrefsName, Context.MODE_PRIVATE);
         }
-
-        private EditorConnection mEditorConnection;
-        private ViewSnapshot mSnapshot;
-        private final Context mContext;
-        private final Lock mStartLock;
-        private final EditProtocol mProtocol;
-
-        // 是否启用 GZip 压缩
-        private boolean mUseGzip;
-
-        private final List<Pair<String, JSONObject>> mEditorEventBindings;
-        private final List<Pair<String, JSONObject>> mPersistentEventBindings;
     }
 
-
-    private class Editor implements EditorConnection.Editor {
+    private class VTrackClientConnection implements VTrackClient.ClientConnection {
 
         @Override
         public void sendSnapshot(JSONObject message) {
@@ -886,47 +941,5 @@ public class VTrackSupported implements VTrack, DebugTracking {
                 mCurrentRetryTimes++;
             }
         }
-
     }
-
-    private static boolean mIsRetryConnect = true;
-    private static int mCurrentRetryTimes = 0;
-    private static final int CONNECT_RETRY_TIMES = 40;
-    private static final long RETRY_TIME_INTERVAL = 30 * 1000;
-    /*
-        WebSocket close Code:
-        check com.guoxiaoxing.cuckoo.java_websocket.framing.CloseFrame.NORMAL
-    */
-    private static final int CLOSE_CODE_NORMAL = 1000;
-    private static final int CLOSE_CODE_GOING_AWAY = 1001;
-    private static final int CLOSE_CODE_NOCODE = 1005;
-
-    private final Context mContext;
-    private final LifecycleCallbacks mLifecycleCallbacks;
-    private final EventViewTracker mEventViewTracker;
-    private final EditState mEditState;
-    private final ViewCrawlerHandler mMessageThreadHandler;
-
-    // VTrack Server 地址
-    private String mVTrackServer = null;
-
-    private final HashSet<Activity> mStartedActivities = new HashSet<>();
-    private final HashSet<String> mDisabledActivity = new HashSet<String>();
-
-    private static final String SHARED_PREF_EDITS_FILE = "sensorsdata";
-    private static final String SHARED_PREF_BINDINGS_KEY = "sensorsdata.viewcrawler.bindings";
-
-    private static final int MESSAGE_INITIALIZE_CHANGES = 0;
-    private static final int MESSAGE_CONNECT_TO_EDITOR = 1;
-    private static final int MESSAGE_SEND_STATE_FOR_EDITING = 2;
-    private static final int MESSAGE_SEND_DEVICE_INFO = 4;
-    private static final int MESSAGE_EVENT_BINDINGS_RECEIVED = 5;
-    private static final int MESSAGE_HANDLE_EDITOR_BINDINGS_RECEIVED = 6;
-    private static final int MESSAGE_SEND_EVENT_TRACKED = 7;
-    private static final int MESSAGE_HANDLE_EDITOR_CLOSED = 8;
-    private static final int MESSAGE_HANDLE_DISCONNECT = 13;
-
-    private static final int EMULATOR_CONNECT_ATTEMPT_INTERVAL_MILLIS = 1000 * 30;
-
-    private static final String TAG = "SA.VTrackSupported";
 }

@@ -191,8 +191,6 @@ public class ViewOnClickReal {
             if (p != null) {
                 ViewUtils.mergeJSONObject(p, properties);
             }
-            Toast.makeText(view.getContext(), String.valueOf(properties.get(AspectjConstants.ELEMENT_ID)), Toast.LENGTH_LONG).show();
-
             Cuckoo.with().track(AspectjConstants.APP_CLICK_EVENT_NAME, properties);
         } catch (Exception e) {
             e.printStackTrace();

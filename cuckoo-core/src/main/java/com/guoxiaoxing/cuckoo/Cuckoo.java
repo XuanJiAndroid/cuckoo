@@ -46,7 +46,7 @@ import com.guoxiaoxing.cuckoo.util.CuckooActivityLifecycleCallbacks;
 import com.guoxiaoxing.cuckoo.util.DataUtils;
 import com.guoxiaoxing.cuckoo.util.JSONUtils;
 import com.guoxiaoxing.cuckoo.util.LogUtils;
-import com.guoxiaoxing.cuckoo.vtrack.AnalyticsMessages;
+import com.guoxiaoxing.cuckoo.vtrack.EventQueue;
 import com.guoxiaoxing.cuckoo.vtrack.DecideMessages;
 import com.guoxiaoxing.cuckoo.vtrack.VTrack;
 import com.guoxiaoxing.cuckoo.vtrack.VTrackSupported;
@@ -76,6 +76,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+/**
+ * For more information, you can visit https://github.com/guoxiaoxing or contact me by
+ * guoxiaoxingse@163.com.
+ *
+ * @author guoxiaoxing
+ */
 public class Cuckoo {
 
     private static final String TAG = "Cuckoo";
@@ -115,7 +121,7 @@ public class Cuckoo {
     private boolean mClearReferrerWhenAppEnd = false;
 
     private final Context mContext;
-    private final AnalyticsMessages mMessages;
+    private final EventQueue mMessages;
     private final PersistentDistinctId mDistinctId;
     private final PersistentLoginId mLoginId;
     private final PersistentSuperProperties mSuperProperties;
@@ -234,8 +240,8 @@ public class Cuckoo {
         }
     }
 
-    Cuckoo(Context context, String serverURL, String configureURL,
-           String vtrackServerURL, DebugMode debugMode) {
+    private Cuckoo(Context context, String serverURL, String configureURL,
+                   String vtrackServerURL, DebugMode debugMode) {
         mContext = context;
         mDebugMode = debugMode;
 
@@ -334,7 +340,7 @@ public class Cuckoo {
                     e);
         }
 
-        mMessages = AnalyticsMessages.getInstance(mContext, packageName);
+        mMessages = EventQueue.getInstance(mContext, packageName);
 
         final SharedPreferencesLoader.OnPrefsLoadedListener listener =
                 new SharedPreferencesLoader.OnPrefsLoadedListener() {
@@ -641,7 +647,7 @@ public class Cuckoo {
                     int responseCode = connection.getResponseCode();
                     if (responseCode == 200) {
                         InputStream in = connection.getInputStream();
-                        byte[] responseBody = AnalyticsMessages.slurp(in);
+                        byte[] responseBody = EventQueue.slurp(in);
                         in.close();
 
                         String response = new String(responseBody, "UTF-8");
@@ -2188,12 +2194,12 @@ public class Cuckoo {
                     if (!loginId.equals(mLoginId.get())) {
                         mLoginId.commit(loginId);
                         if (!loginId.equals(getAnonymousId())) {
-                            mMessages.enqueueEventMessage(type, eventObject);
+                            mMessages.enqueueEvent(type, eventObject);
                         }
                     }
                 }
             } else {
-                mMessages.enqueueEventMessage(type, eventObject);
+                mMessages.enqueueEvent(type, eventObject);
             }
         } catch (Exception e) {
             //ignore
@@ -2370,7 +2376,7 @@ public class Cuckoo {
                 }
 
                 if (isDepolyed) {
-                    mMessages.enqueueEventMessage(eventType.getEventType(), dataObj);
+                    mMessages.enqueueEvent(eventType.getEventType(), dataObj);
                     LogUtils.i(TAG, "track event:\n" + JSONUtils.formatJson(dataObj.toString()));
                 }
             } catch (JSONException e) {

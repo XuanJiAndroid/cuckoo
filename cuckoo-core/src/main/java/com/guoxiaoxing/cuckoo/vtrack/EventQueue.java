@@ -43,31 +43,45 @@ import java.util.zip.GZIPOutputStream;
  * <p>This class straddles the thread boundary between user threads and
  * a logical SensorsData thread.
  */
-public class AnalyticsMessages {
+public class EventQueue {
+
+    private static final String TAG = "SCuckoo.EventQueue";
+
+    // Used across thread boundaries
+    private final Worker mWorker;
+    private final Context mContext;
+    private final DbAdapter mDbAdapter;
+
+    // Messages for our thread
+    private static final int FLUSH_QUEUE = 3;
+    private static final int CHECK_CONFIGURE = 4; // 从SA获取配置信息
+
+    private static final Map<Context, EventQueue> sInstances =
+            new HashMap<Context, EventQueue>();
 
     /**
-     * Do not call directly. You should call AnalyticsMessages.getInstance()
+     * Do not call directly. You should call EventQueue.getInstance()
      */
-    public AnalyticsMessages(final Context context, final String packageName) {
+    public EventQueue(final Context context, final String packageName) {
         mContext = context;
         mDbAdapter = new DbAdapter(mContext, packageName/*dbName*/);
         mWorker = new Worker();
     }
 
     /**
-     * Use this to get an instance of AnalyticsMessages instead of creating one directly
+     * Use this to get an instance of EventQueue instead of creating one directly
      * for yourself.
      *
      * @param messageContext should be the Main Activity of the application
      *                       associated with these messages.
      */
-    public static AnalyticsMessages getInstance(final Context messageContext, final String
+    public static EventQueue getInstance(final Context messageContext, final String
             packageName) {
         synchronized (sInstances) {
             final Context appContext = messageContext.getApplicationContext();
-            final AnalyticsMessages ret;
+            final EventQueue ret;
             if (!sInstances.containsKey(appContext)) {
-                ret = new AnalyticsMessages(appContext, packageName);
+                ret = new EventQueue(appContext, packageName);
                 sInstances.put(appContext, ret);
             } else {
                 ret = sInstances.get(appContext);
@@ -76,7 +90,7 @@ public class AnalyticsMessages {
         }
     }
 
-    public void enqueueEventMessage(final String type, final JSONObject eventJson) {
+    public void enqueueEvent(final String type, final JSONObject eventJson) {
         try {
             synchronized (mDbAdapter) {
                 int ret = mDbAdapter.addJSON(eventJson, DbAdapter.Table.EVENTS);
@@ -94,20 +108,20 @@ public class AnalyticsMessages {
 
                 if (Cuckoo.with(mContext).isDebugMode() || ret ==
                         DbAdapter.DB_OUT_OF_MEMORY_ERROR) {
-                    mWorker.runMessage(m);
+                    mWorker.sendMessage(m);
                 } else {
                     // track_signup 立即发送
                     if (type.equals("track_signup") || ret > Cuckoo.with(mContext)
                             .getFlushBulkSize()) {
-                        mWorker.runMessage(m);
+                        mWorker.sendMessage(m);
                     } else {
                         final int interval = Cuckoo.with(mContext).getFlushInterval();
-                        mWorker.runMessageOnce(m, interval);
+                        mWorker.sendMessageOnce(m, interval);
                     }
                 }
             }
         } catch (Exception e) {
-            LogUtils.i(TAG, "enqueueEventMessage error:" + e);
+            LogUtils.i(TAG, "enqueueEvent error:" + e);
         }
     }
 
@@ -116,14 +130,14 @@ public class AnalyticsMessages {
         m.what = CHECK_CONFIGURE;
         m.obj = check;
 
-        mWorker.runMessage(m);
+        mWorker.sendMessage(m);
     }
 
     public void flush() {
         final Message m = Message.obtain();
         m.what = FLUSH_QUEUE;
 
-        mWorker.runMessage(m);
+        mWorker.sendMessage(m);
     }
 
     public static byte[] slurp(final InputStream inputStream)
@@ -372,19 +386,22 @@ public class AnalyticsMessages {
     }
 
     // Worker will manage the (at most single) IO thread associated with
-    // this AnalyticsMessages instance.
+    // this EventQueue instance.
     // XXX: Worker class is unnecessary, should be just a subclass of HandlerThread
     private class Worker {
 
+        private final Object mHandlerLock = new Object();
+        private Handler mHandler;
+
         public Worker() {
             final HandlerThread thread =
-                    new HandlerThread("com.guoxiaoxing.cuckoo.vtrack.AnalyticsMessages.Worker",
+                    new HandlerThread("com.guoxiaoxing.cuckoo.vtrack.EventQueue.Worker",
                             Thread.MIN_PRIORITY);
             thread.start();
-            mHandler = new AnalyticsMessageHandler(thread.getLooper());
+            mHandler = new EventHandler(thread.getLooper());
         }
 
-        public void runMessage(Message msg) {
+        public void sendMessage(Message msg) {
             synchronized (mHandlerLock) {
                 if (mHandler == null) {
                     // We died under suspicious circumstances. Don't try to send any more events.
@@ -395,7 +412,7 @@ public class AnalyticsMessages {
             }
         }
 
-        public void runMessageOnce(Message msg, long delay) {
+        public void sendMessageOnce(Message msg, long delay) {
             synchronized (mHandlerLock) {
                 if (mHandler == null) {
                     // We died under suspicious circumstances. Don't try to send any more events.
@@ -408,9 +425,9 @@ public class AnalyticsMessages {
             }
         }
 
-        private class AnalyticsMessageHandler extends Handler {
+        private class EventHandler extends Handler {
 
-            public AnalyticsMessageHandler(Looper looper) {
+            public EventHandler(Looper looper) {
                 super(looper);
             }
 
@@ -451,23 +468,5 @@ public class AnalyticsMessages {
                 }
             }
         }
-
-        private final Object mHandlerLock = new Object();
-        private Handler mHandler;
     }
-
-    // Used across thread boundaries
-    private final Worker mWorker;
-    private final Context mContext;
-    private final DbAdapter mDbAdapter;
-
-    // Messages for our thread
-    private static final int FLUSH_QUEUE = 3;
-    private static final int CHECK_CONFIGURE = 4; // 从SA获取配置信息
-
-    private static final String TAG = "SA.AnalyticsMessages";
-
-    private static final Map<Context, AnalyticsMessages> sInstances =
-            new HashMap<Context, AnalyticsMessages>();
-
 }

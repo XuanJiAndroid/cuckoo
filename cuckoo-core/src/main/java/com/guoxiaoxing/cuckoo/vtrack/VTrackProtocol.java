@@ -17,9 +17,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class EditProtocol {
+public class VTrackProtocol {
 
-    private static final String TAG = "Cuckoo.EditProtocol";
+    private static final String TAG = "Cuckoo.VTrackProtocol";
 
     private final ResourceIds mResourceIds;
 
@@ -48,7 +48,7 @@ public class EditProtocol {
         }
     }
 
-    public EditProtocol(ResourceIds resourceIds) {
+    public VTrackProtocol(ResourceIds resourceIds) {
         mResourceIds = resourceIds;
     }
 

@@ -21,10 +21,20 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 
 /**
- * EditorClient should handle all communication to and from the socket. It should be fairly naive and
+ * VTrackWebSocketClient should handle all communication to and from the socket. It should be fairly naive and
  * only know how to delegate messages to the ABHandler class.
  */
-public class EditorConnection {
+public class VTrackClient {
+
+    private static final String TAG = "$Cuckoo.VTrackClient";
+
+    private final URI mURI;
+    private final ClientConnection mClientConnection;
+    private final VTrackWebSocketClient mWebSocketClient;
+
+    private static final int CONNECT_TIMEOUT = 1000;
+    private static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocate(0);
+
 
     public class EditorConnectionException extends IOException {
         private static final long serialVersionUID = -1884953175346045636L;
@@ -34,7 +44,7 @@ public class EditorConnection {
         }
     }
 
-    public interface Editor {
+    public interface ClientConnection {
         void sendSnapshot(JSONObject message);
 
         void bindEvents(JSONObject message);
@@ -50,20 +60,20 @@ public class EditorConnection {
         void onWebSocketClose(int code);
     }
 
-    public EditorConnection(URI uri, Editor service)
+    public VTrackClient(URI uri, ClientConnection service)
             throws EditorConnectionException {
-        mService = service;
         mURI = uri;
+        mClientConnection = service;
         try {
-            mClient = new EditorClient(uri, CONNECT_TIMEOUT);
-            mClient.connectBlocking();
+            mWebSocketClient = new VTrackWebSocketClient(uri, CONNECT_TIMEOUT);
+            mWebSocketClient.connectBlocking();
         } catch (final InterruptedException e) {
             throw new EditorConnectionException(e);
         }
     }
 
     public boolean isValid() {
-        return !mClient.isClosed() && !mClient.isClosing() && !mClient.isFlushAndClose();
+        return !mWebSocketClient.isClosed() && !mWebSocketClient.isClosing() && !mWebSocketClient.isFlushAndClose();
     }
 
     public BufferedOutputStream getBufferedOutputStream() {
@@ -73,30 +83,30 @@ public class EditorConnection {
     public void sendMessage(String message) {
         LogUtils.i(TAG, "Sending message: " + message);
         try {
-            mClient.send(message);
+            mWebSocketClient.send(message);
         } catch (Exception e) {
             LogUtils.i(TAG, "sendMessage;error", e);
         }
     }
 
     public void close(boolean block) {
-        if (mClient == null) {
+        if (mWebSocketClient == null) {
             return;
         }
         try {
             if (block) {
-                mClient.closeBlocking();
+                mWebSocketClient.closeBlocking();
             } else {
-                mClient.close();
+                mWebSocketClient.close();
             }
         } catch (Exception e) {
             LogUtils.i(TAG, "close;error", e);
         }
     }
 
-    private class EditorClient extends WebSocketClient {
+    private class VTrackWebSocketClient extends WebSocketClient {
 
-        public EditorClient(URI uri, int connectTimeout) throws InterruptedException {
+        public VTrackWebSocketClient(URI uri, int connectTimeout) throws InterruptedException {
             super(uri, new Draft_17(), null, connectTimeout);
         }
 
@@ -107,7 +117,7 @@ public class EditorConnection {
                         .getHttpStatusMessage());
             }
 
-            mService.onWebSocketOpen();
+            mClientConnection.onWebSocketOpen();
         }
 
         @Override
@@ -118,13 +128,13 @@ public class EditorConnection {
                 final JSONObject messageJson = new JSONObject(message);
                 final String type = messageJson.getString("type");
                 if (type.equals("device_info_request")) {
-                    mService.sendDeviceInfo(messageJson);
+                    mClientConnection.sendDeviceInfo(messageJson);
                 } else if (type.equals("snapshot_request")) {
-                    mService.sendSnapshot(messageJson);
+                    mClientConnection.sendSnapshot(messageJson);
                 } else if (type.equals("event_binding_request")) {
-                    mService.bindEvents(messageJson);
+                    mClientConnection.bindEvents(messageJson);
                 } else if (type.equals("disconnect")) {
-                    mService.disconnect();
+                    mClientConnection.disconnect();
                 }
             } catch (final JSONException e) {
                 LogUtils.i(TAG, "Bad JSON received:" + message, e);
@@ -134,8 +144,8 @@ public class EditorConnection {
         @Override
         public void onClose(int code, String reason, boolean remote) {
             Log.i(TAG, "WebSocket closed. Code: " + code + ", reason: " + reason + "\nURI: " + mURI);
-            mService.cleanup();
-            mService.onWebSocketClose(code);
+            mClientConnection.cleanup();
+            mClientConnection.onWebSocketClose(code);
         }
 
         @Override
@@ -170,7 +180,7 @@ public class EditorConnection {
                 throws EditorConnectionException {
             final ByteBuffer message = ByteBuffer.wrap(b, off, len);
             try {
-                mClient.sendFragmentedFrame(Framedata.Opcode.TEXT, message, false);
+                mWebSocketClient.sendFragmentedFrame(Framedata.Opcode.TEXT, message, false);
             } catch (final WebsocketNotConnectedException e) {
                 throw new EditorConnectionException(e);
             } catch (final NotSendableException e) {
@@ -182,7 +192,7 @@ public class EditorConnection {
         public void close()
                 throws EditorConnectionException {
             try {
-                mClient.sendFragmentedFrame(Framedata.Opcode.TEXT, EMPTY_BYTE_BUFFER, true);
+                mWebSocketClient.sendFragmentedFrame(Framedata.Opcode.TEXT, EMPTY_BYTE_BUFFER, true);
             } catch (final WebsocketNotConnectedException e) {
                 throw new EditorConnectionException(e);
             } catch (final NotSendableException e) {
@@ -190,13 +200,4 @@ public class EditorConnection {
             }
         }
     }
-
-    private final Editor mService;
-    private final EditorClient mClient;
-    private final URI mURI;
-
-    private static final int CONNECT_TIMEOUT = 1000;
-    private static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocate(0);
-
-    private static final String TAG = "SA.EditorConnection";
 }
